@@ -57,21 +57,31 @@ def generate_maze(rows, cols):
     maze[rows - 2][cols - 2] = 2  # 출구 설정
     return maze
 
-def trigger_random_event(maze, ROWS, COLS):
+def trigger_random_event(maze, ROWS, COLS, screen, enemies, player_x, player_y):
     """랜덤 이벤트 발생"""
-    event_type = random.choice(["darkness", "wall_change", "extra_enemy", "none"])
+    event_type = random.choice(["darkness", "none"])
     if event_type == "darkness":
         print("🔦 정전 발생! 잠시 동안 화면이 어두워집니다!")
+        fade_surface = pygame.Surface((screen.get_width(), screen.get_height()))
+        fade_surface.fill((0, 0, 0))
+        for alpha in range(0, 180, 5):  # 점진적으로 어두워짐
+            fade_surface.set_alpha(alpha)
+            screen.blit(fade_surface, (0, 0))
+            pygame.display.update()
+            pygame.time.delay(50)
+        pygame.time.delay(3000)  # 3초 동안 정전 유지
         return "darkness"
-    elif event_type == "wall_change":
-        print("🔄 미로가 변형됩니다!")
-        for _ in range(random.randint(2, 5)):
-            rand_x, rand_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
-            if maze[rand_y][rand_x] == 0:
-                maze[rand_y][rand_x] = 1  # 길을 벽으로 바꿈
-        return "wall_change"
+    
     elif event_type == "extra_enemy":
         print("⚠️ 추가 적이 나타났습니다!")
+        new_enemy_x, new_enemy_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
+        while maze[new_enemy_y][new_enemy_x] != 0:  # 길 위에만 적 생성
+            new_enemy_x, new_enemy_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
+        enemies.append((new_enemy_x, new_enemy_y))  # 적 리스트에 추가
+        new_enemy_x, new_enemy_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
+        while maze[new_enemy_y][new_enemy_x] != 0:  # 길 위에만 적 생성
+            new_enemy_x, new_enemy_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
+        enemies.append((new_enemy_x, new_enemy_y))
         return "extra_enemy"
     return None
 
@@ -100,8 +110,8 @@ def play_game(difficulty):
                     pygame.draw.rect(screen, (0, 255, 0), rect)
         pygame.draw.rect(screen, (0, 0, 255), (player_x * TILE_SIZE, player_y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
         
-        if time.time() - event_timer > random.randint(10, 20):  # 10~20초마다 랜덤 이벤트 발생
-            trigger_random_event(maze, ROWS, COLS)
+        if time.time() - event_timer > random.randint(5, 7):  # 10~20초마다 랜덤 이벤트 발생
+            trigger_random_event(maze, ROWS, COLS, screen, enemies, player_x, player_y)
             event_timer = time.time()
 
         for event in pygame.event.get():
