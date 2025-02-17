@@ -1,6 +1,7 @@
 import sys
 import pygame
 import random
+import time
 
 # 게임 초기 설정
 pygame.init()
@@ -56,22 +57,32 @@ def generate_maze(rows, cols):
     maze[rows - 2][cols - 2] = 2  # 출구 설정
     return maze
 
-def move_enemy(enemy_x, enemy_y, maze):
-    """적 NPC를 랜덤하게 이동시키는 함수"""
-    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-    random.shuffle(directions)
-    for dx, dy in directions:
-        new_x, new_y = enemy_x + dx, enemy_y + dy
-        if maze[new_y][new_x] == 0:  # 길이 있는 경우만 이동
-            return new_x, new_y
-    return enemy_x, enemy_y
+def trigger_random_event(maze, ROWS, COLS):
+    """랜덤 이벤트 발생"""
+    event_type = random.choice(["darkness", "wall_change", "extra_enemy", "none"])
+    if event_type == "darkness":
+        print("🔦 정전 발생! 잠시 동안 화면이 어두워집니다!")
+        return "darkness"
+    elif event_type == "wall_change":
+        print("🔄 미로가 변형됩니다!")
+        for _ in range(random.randint(2, 5)):
+            rand_x, rand_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
+            if maze[rand_y][rand_x] == 0:
+                maze[rand_y][rand_x] = 1  # 길을 벽으로 바꿈
+        return "wall_change"
+    elif event_type == "extra_enemy":
+        print("⚠️ 추가 적이 나타났습니다!")
+        return "extra_enemy"
+    return None
 
 def play_game(difficulty):
     ROWS, COLS = DIFFICULTY_SIZES[difficulty]
     WIDTH, HEIGHT = COLS * TILE_SIZE, ROWS * TILE_SIZE
     maze = generate_maze(ROWS, COLS)
     player_x, player_y = 1, 1
-    enemy_x, enemy_y = COLS - 3, ROWS - 3  # 적의 초기 위치
+    enemies = [(COLS - 3, ROWS - 3), (2, ROWS - 4), (COLS - 4, 2)]  # 다수의 적 생성
+    move_delay = 1.0  # 적이 느리게 움직이도록 설정
+    event_timer = time.time()  # 이벤트 발생 시간 기록
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(f"Maze Escape - {difficulty.capitalize()} Mode")
@@ -88,8 +99,11 @@ def play_game(difficulty):
                 elif maze[row][col] == 2:
                     pygame.draw.rect(screen, (0, 255, 0), rect)
         pygame.draw.rect(screen, (0, 0, 255), (player_x * TILE_SIZE, player_y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
-        pygame.draw.rect(screen, (255, 0, 0), (enemy_x * TILE_SIZE, enemy_y * TILE_SIZE, TILE_SIZE, TILE_SIZE))  # 적 그리기
         
+        if time.time() - event_timer > random.randint(10, 20):  # 10~20초마다 랜덤 이벤트 발생
+            trigger_random_event(maze, ROWS, COLS)
+            event_timer = time.time()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -110,12 +124,6 @@ def play_game(difficulty):
                 if maze[player_y][player_x] == 2:
                     print("탈출 성공!")
                     running = False
-        
-        enemy_x, enemy_y = move_enemy(enemy_x, enemy_y, maze)  # 적 이동
-        
-        if player_x == enemy_x and player_y == enemy_y:
-            print("적에게 잡혔습니다! 게임 오버!")
-            running = False
         
         pygame.display.flip()
         clock.tick(30)
