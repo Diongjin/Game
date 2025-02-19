@@ -19,15 +19,12 @@ DIFFICULTY_SIZES = {
     "hard": (25, 25)
 }
 
-def select_difficulty():
-    """게임 시작 전에 난이도를 선택하는 함수"""
-    print("난이도를 선택하세요: \n1. 쉬움 (Easy)\n2. 보통 (Medium)\n3. 어려움 (Hard)")
-    choice = input("번호를 입력하세요 (1-3): ")
-    if choice in ["1", "2", "3"]:
-        return DIFFICULTY_LEVELS[int(choice) - 1]
-    else:
-        print("잘못된 입력입니다. 기본 난이도(보통)로 설정합니다.")
-        return "medium"
+# 최고 기록 로드
+try:
+    with open("best_time.txt", "r") as file:
+        best_time = float(file.read().strip())
+except FileNotFoundError:
+    best_time = float('inf')
 
 def generate_maze(rows, cols):
     """난이도에 따라 랜덤한 미로 생성"""
@@ -53,40 +50,12 @@ def generate_maze(rows, cols):
     maze[rows - 2][cols - 2] = 2  # 출구 설정
     return maze
 
-def trigger_random_event(maze, ROWS, COLS, screen, player_x, player_y, portals):
-    """랜덤 이벤트 발생 (정전 & 포털 생성)"""
-    event_type = random.choice(["darkness", "portal", "none"])
-    
-    if event_type == "portal" and len(portals) < 2:
-        print("🌀 포털 생성!")
-        while len(portals) < 2:  # 두 개의 포털 생성
-            portal_x, portal_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
-            while maze[portal_y][portal_x] != 0 or (portal_x, portal_y) in portals:
-                portal_x, portal_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
-            portals.append((portal_x, portal_y))
-        return "portal"
-
-    if event_type == "darkness":
-        print("🔦 정전 발생! 잠시 동안 화면이 어두워집니다!")
-        fade_surface = pygame.Surface((screen.get_width(), screen.get_height()))
-        fade_surface.fill((0, 0, 0))
-        for alpha in range(0, 180, 5):  # 점진적으로 어두워짐
-            fade_surface.set_alpha(alpha)
-            screen.blit(fade_surface, (0, 0))
-            pygame.display.update()
-            pygame.time.delay(50)
-        pygame.time.delay(3000)  # 3초 동안 정전 유지
-        return "darkness"
-
-    return None
-
 def play_game(difficulty):
+    global best_time
     ROWS, COLS = DIFFICULTY_SIZES[difficulty]
     WIDTH, HEIGHT = COLS * TILE_SIZE, ROWS * TILE_SIZE
     maze = generate_maze(ROWS, COLS)
     player_x, player_y = 1, 1
-    portals = []  # 포털 리스트 추가
-    event_timer = time.time()  # 이벤트 발생 시간 기록
     start_time = time.time()  # 단계 시작 시간
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -97,7 +66,7 @@ def play_game(difficulty):
     while running:
         screen.fill((255, 255, 255))
 
-        # 미로 및 포털 그리기
+        # 미로 및 플레이어 그리기
         for row in range(ROWS):
             for col in range(COLS):
                 rect = pygame.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
@@ -105,17 +74,8 @@ def play_game(difficulty):
                     pygame.draw.rect(screen, (0, 0, 0), rect)  # 벽
                 elif maze[row][col] == 2:
                     pygame.draw.rect(screen, (0, 255, 0), rect)  # 출구
-        
-        # 포털 이미지 표시
-        for portal_x, portal_y in portals:
-            screen.blit(portal_image, (portal_x * TILE_SIZE, portal_y * TILE_SIZE))
 
         pygame.draw.rect(screen, (0, 0, 255), (player_x * TILE_SIZE, player_y * TILE_SIZE, TILE_SIZE, TILE_SIZE))  # 플레이어
-
-        # 일정 시간마다 랜덤 이벤트 발생
-        if time.time() - event_timer > random.randint(5, 7):
-            trigger_random_event(maze, ROWS, COLS, screen, player_x, player_y, portals)
-            event_timer = time.time()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -136,7 +96,7 @@ def play_game(difficulty):
 
                 if maze[player_y][player_x] == 2:
                     end_time = time.time() - start_time
-                    print(f"탈출 성공! 걸린 시간: {end_time:.2f}초")
+                    print(f"{difficulty.capitalize()} 단계 탈출! 걸린 시간: {end_time:.2f}초")
                     return end_time
 
         pygame.display.flip()
@@ -146,18 +106,19 @@ def play_game(difficulty):
     return None
 
 if __name__ == "__main__":
-    difficulty = select_difficulty()
     total_time = 0
-    while difficulty:
+    for difficulty in DIFFICULTY_LEVELS:
         stage_time = play_game(difficulty)
         if stage_time is not None:
             total_time += stage_time
-        if difficulty in ["easy", "medium"]:
-            next_level = input("다음 단계로 진행하시겠습니까? (y/n): ")
-            if next_level.lower() == "y":
-                difficulty = DIFFICULTY_LEVELS[DIFFICULTY_LEVELS.index(difficulty) + 1]
-            else:
-                break
-        else:
-            break
+    
     print(f"총 탈출 시간: {total_time:.2f}초")
+    
+    # 최고 기록 갱신 여부 확인 및 저장
+    if total_time < best_time:
+        best_time = total_time
+        with open("best_time.txt", "w") as file:
+            file.write(f"{best_time:.2f}")
+        print(f"🎉 새로운 최고 기록! {best_time:.2f}초 🎉")
+    else:
+        print(f"현재 최고 기록: {best_time:.2f}초")
